@@ -353,9 +353,7 @@ def assign_solution(n):
 
             else:
                 set_from_frame(n, c, attr, df)
-        elif attr == "n_mod":
-            n.df(c)[attr].update(df)
-        else:
+        elif attr != "n_mod":
             n.df(c)[attr + "_opt"].update(df)
 
     # if nominal capacity was no variable set optimal value to nominal
@@ -453,6 +451,12 @@ def post_processing(n):
     # load
     if len(n.loads):
         set_from_frame(n, "Load", "p", get_as_dense(n, "Load", "p_set", sns))
+
+    # line losses
+    if "Line-loss" in n.model.variables:
+        losses = n.model["Line-loss"].solution.to_pandas()
+        n.lines_t.p0 += losses / 2
+        n.lines_t.p1 += losses / 2
 
     # recalculate injection
     ca = [
@@ -553,7 +557,13 @@ def optimize(
 
     Returns
     -------
-    None.
+    status : str
+        The status of the optimization, either "ok" or one of the codes listed
+        in https://linopy.readthedocs.io/en/latest/generated/linopy.constants.SolverStatus.html
+    condition : str
+        The termination condition of the optimization, either
+        "optimal" or one of the codes listed in
+        https://linopy.readthedocs.io/en/latest/generated/linopy.constants.TerminationCondition.html
     """
 
     sns = _as_snapshots(n, snapshots)
@@ -598,7 +608,12 @@ class OptimizationAccessor:
         return create_model(self._parent, *args, **kwargs)
 
     def solve_model(
-        self, solver_name="glpk", solver_options={}, assign_all_duals=False, **kwargs
+        self,
+        extra_functionality=None,
+        solver_name="glpk",
+        solver_options={},
+        assign_all_duals=False,
+        **kwargs,
     ):
         """
         Solve an already created model and assign its solution to the network.
@@ -615,8 +630,21 @@ class OptimizationAccessor:
         **kwargs:
             Keyword argument used by `linopy.Model.solve`, such as `solver_name`,
             `problem_fn` or solver options directly passed to the solver.
+
+        Returns
+        -------
+        status : str
+            The status of the optimization, either "ok" or one of the
+            codes listed in
+            https://linopy.readthedocs.io/en/latest/generated/linopy.constants.SolverStatus.html
+        condition : str
+            The termination condition of the optimization, either
+            "optimal" or one of the codes listed in
+            https://linopy.readthedocs.io/en/latest/generated/linopy.constants.TerminationCondition.html
         """
         n = self._parent
+        if extra_functionality:
+            extra_functionality(n, n.snapshots)
         m = n.model
         status, condition = m.solve(solver_name=solver_name, **solver_options, **kwargs)
 
