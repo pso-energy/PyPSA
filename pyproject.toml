@@ -31,7 +31,7 @@ dependencies = [
     "xarray",
     "netcdf4",
     "tables",
-    "linopy>=0.3.12",
+    "linopy@git+https://github.com/pso-energy/linopy.git@master",
     "matplotlib",
     "geopandas>=0.9",
     "networkx>=2",
